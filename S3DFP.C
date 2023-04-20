@@ -19,6 +19,8 @@ void set_vertical_resolution_dfp(unsigned int vertical_resolution);
 // Variables
 char log_buffer[BUFFER_SIZE] = {0};
 int buffer_position = 0;
+unsigned int vertical_resolution = 0;
+unsigned int horizontal_resolution = 0;
 
 #pragma argsused
 void _interrupt _far new_interrupt_handler() {
@@ -103,8 +105,6 @@ unsigned int get_vertical_resolution_crt() {
     write_vga_sequencer_register(0x67, (sr67_value << 2) | (sr67_current_value & 0xF3));
 } */
 
-
-
 void set_vertical_resolution_dfp(unsigned int vertical_resolution) {
     // Calculate values for Sequencer registers
     unsigned int panel_size = vertical_resolution - 1;
@@ -127,8 +127,7 @@ int main() {
 
     printf("TSR active. Press any key to unload TSR.\n");
 	
-	unsigned int vertical_resolution = get_vertical_resolution_crt();
-	set_vertical_resolution_dfp_resolution(vertical_resolution);
+	
 
     while (!kbhit()) {
         /* TSR active, wait for a keypress */
@@ -145,6 +144,17 @@ int main() {
 
     fwrite(log_buffer, 1, buffer_position, log_file);
     fclose(log_file);
+
+    horizontal_resolution = get_horizontal_resolution_crt();
+
+    vertical_resolution = get_vertical_resolution_crt();
+
+	set_vertical_resolution_dfp(vertical_resolution);
+
+    
+
+    printf("Horizontal resolution = %d\n",horizontal_resolution);
+    printf("Vertical resolution = %d\n",vertical_resolution);
 
     printf("TSR unloaded.\n");
 
