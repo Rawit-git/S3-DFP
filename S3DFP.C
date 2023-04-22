@@ -154,7 +154,9 @@ int main() {
 
     printf("TSR active. Press any key to unload TSR.\n");
 	
-	
+	horizontal_resolution = get_horizontal_resolution_crt();
+    vertical_resolution = get_vertical_resolution_crt();
+	vertical_lines = get_vertical_lines();
 
     while (!kbhit()) {
         /* TSR active, wait for a keypress */
@@ -169,24 +171,11 @@ int main() {
         return 1;
     }
 
-    fwrite(log_buffer, 1, buffer_position, log_file);
+    fprintf(log_file, "Horizontal resolution = %d\n", horizontal_resolution);
+    fprintf(log_file, "Vertical resolution = %d\n", vertical_resolution);
+    fprintf(log_file, "Vertical lines = %d\n", vertical_lines);
+
     fclose(log_file);
-	
-	
-
-    horizontal_resolution = get_horizontal_resolution_crt();
-
-    vertical_resolution = get_vertical_resolution_crt();
-	
-	vertical_lines = get_vertical_lines();
-
-	set_vertical_resolution_dfp(vertical_resolution);
-
-    
-
-    printf("Horizontal resolution = %d\n",horizontal_resolution);
-    printf("Vertical resolution = %d\n",vertical_resolution);
-	printf("Vertical lines = %d\n",vertical_lines);
 
     printf("TSR unloaded.\n");
 
