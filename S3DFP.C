@@ -13,6 +13,7 @@ unsigned char read_vga_sequencer_register(unsigned char index);
 void write_vga_sequencer_register(unsigned char index, unsigned char value);
 unsigned int get_horizontal_resolution_crt();
 unsigned int get_vertical_resolution_crt();
+unsigned int get_vertical_lines();
 /* void set_horizontal_resolution(unsigned int horizontal_resolution); */
 void set_vertical_resolution_dfp(unsigned int vertical_resolution);
 
@@ -21,6 +22,7 @@ char log_buffer[BUFFER_SIZE] = {0};
 int buffer_position = 0;
 unsigned int vertical_resolution = 0;
 unsigned int horizontal_resolution = 0;
+unsigned int vertical_lines = 0;
 
 #pragma argsused
 void _interrupt _far new_interrupt_handler() {
@@ -39,8 +41,13 @@ void _interrupt _far new_interrupt_handler() {
 }
 
 unsigned char read_vga_sequencer_register(unsigned char index) {
-    outp(0x3D4, index);        // Write the index to the CRT Index Register (3D4h)
-    return inp(0x3D5);         // Read the value from the CRT Data Register (3D5h)
+	unsigned int port;
+	
+	// Determine if the display is color or b/w and use the correct register
+	port = (inp(0x3CC)&1)?0x3D4:0x3B4;
+	
+    outp(port, index);        // Write the index to the CRT Index Register (3B4h/3D4h)
+    return inp(port + 1);     // Read the value from the CRT Data Register (3B5h/3D5h)
 }
 
 void write_vga_sequencer_register(unsigned char index, unsigned char value) {
@@ -55,8 +62,12 @@ unsigned int get_horizontal_resolution_crt() {
     // Read CR01 (Horizontal Display Enable End)
     unsigned char horizontal_display_enable_end = read_vga_sequencer_register(0x01);
 
-    // Calculate horizontal resolution
-    unsigned int horizontal_resolution = (horizontal_display_enable_end + 1) * 8;
+    // Read SR01 (Clocking Mode Register)
+	unsigned char sr1 = read_vga_sequencer_register(0x01);
+	unsigned int dot_clock = (sr1 & 0x01) ? 8 : 9;
+
+	// Calculate horizontal resolution
+    unsigned int horizontal_resolution = (horizontal_display_enable_end + 1) * dot_clock;
 
     return horizontal_resolution;
 }
@@ -87,18 +98,34 @@ unsigned int get_vertical_resolution_crt() {
     return vertical_resolution;
 }
 
+unsigned int get_vertical_lines() {
+	
+	unsigned int port;
+    unsigned int lines;
+	unsigned int extra;
+	unsigned char t;
+
+	/* read from the card how many active display lines there are */
+	outp(port,0x12); /* display end */
+	lines = inp(port+1); /* bits 0-7 */
+	outp(port,0x07); /* overflow */
+	t = inp(port+1);
+	lines += (t&0x02)?0x100:0x000;
+	lines += (t&0x40)?0x200:0x000;
+	lines++; /* display reg is value - 1 */
+	
+	return lines;
+}
+
 /* void set_horizontal_resolution(unsigned int horizontal_resolution) {
     unsigned int horizontal_panel_size = horizontal_resolution / 8 - 1;
-
     // Set SR61 (lower 8 bits)
     unsigned char sr61_value = horizontal_panel_size & 0xFF;
     write_vga_sequencer_register(0x61, sr61_value);
-
     // Set SR66 (bit 8)
     unsigned char sr66_value = (horizontal_panel_size >> 8) & 0x01;
     unsigned char sr66_current_value = read_vga_sequencer_register(0x66);
     write_vga_sequencer_register(0x66, (sr66_value << 1) | (sr66_current_value & 0xFD));
-
     // Set SR67 (bits 10-9)
     unsigned char sr67_value = (horizontal_panel_size >> 9) & 0x03;
     unsigned char sr67_current_value = read_vga_sequencer_register(0x67);
@@ -144,10 +171,14 @@ int main() {
 
     fwrite(log_buffer, 1, buffer_position, log_file);
     fclose(log_file);
+	
+	
 
     horizontal_resolution = get_horizontal_resolution_crt();
 
     vertical_resolution = get_vertical_resolution_crt();
+	
+	vertical_lines = get_vertical_lines();
 
 	set_vertical_resolution_dfp(vertical_resolution);
 
@@ -155,6 +186,7 @@ int main() {
 
     printf("Horizontal resolution = %d\n",horizontal_resolution);
     printf("Vertical resolution = %d\n",vertical_resolution);
+	printf("Vertical lines = %d\n",vertical_lines);
 
     printf("TSR unloaded.\n");
 
